@@ -360,56 +360,104 @@ df['label'] = df.target.map(normalize_binary)
 # print(df.groupby(['target', 'time']).agg({'length': 'mean', 'exclaim':'mean', 'point':'mean', 'capital':'mean', 'capital_lower_ration':'mean', 'multiple':'mean'}))
 
 
-# cvec = CountVectorizer(preprocessor=tweet_cleaner, stop_words=gensim.parsing.preprocessing.STOPWORDS)
-# cvec.fit(df.text)
-# neg_doc_matrix = cvec.transform(df[df.target == 0].text)
-# pos_doc_matrix = cvec.transform(df[df.target == 4].text)
-# neg_tf = np.sum(neg_doc_matrix, axis=0)
-# pos_tf = np.sum(pos_doc_matrix, axis=0)
-# neg = np.squeeze(np.asarray(neg_tf))
-# pos = np.squeeze(np.asarray(pos_tf))
-# term_freq_df = pd.DataFrame([neg, pos],
-#                             columns=cvec.get_feature_names()
-#                             ).transpose()
-# term_freq_df.columns = ['negative', 'positive']
-# term_freq_df['total'] = term_freq_df['negative'] + term_freq_df['positive']
-# term_freq_df.sort_values(by='total', ascending=False).iloc[:10]
-#
-# y_pos = np.arange(50)
-# plt.figure(figsize=(12, 10))
-# plt.bar(y_pos,
-#         term_freq_df.sort_values(by='negative', ascending=False)
-#         ['negative'][:50],
-#         align='center',
-#         alpha=0.5)
-# plt.xticks(y_pos,
-#            term_freq_df.sort_values(by='negative', ascending=False)
-#            ['negative']
-#            [:50].index,
-#            rotation='vertical')
-# plt.ylabel('Frequency')
-# plt.xlabel('Top 50 negative tokens')
-# plt.title('Top 50 tokens in negative tweets')
-#
-# plt.show()
-#
-# y_pos = np.arange(50)
-# plt.figure(figsize=(12, 10))
-# plt.bar(y_pos,
-#         term_freq_df.sort_values(by='positive', ascending=False)
-#         ['positive'][:50],
-#         align='center',
-#         alpha=0.5)
-# plt.xticks(y_pos,
-#            term_freq_df.sort_values(by='positive', ascending=False)
-#            ['positive']
-#            [:50].index,
-#            rotation='vertical')
-# plt.ylabel('Frequency')
-# plt.xlabel('Top 50 positive tokens')
-# plt.title('Top 50 tokens in positive tweets')
-#
-# plt.show()
+def explore_dataset():
+    cvec = CountVectorizer(preprocessor=tweet_cleaner, stop_words=gensim.parsing.preprocessing.STOPWORDS)
+    cvec.fit(df.text)
+    neg_doc_matrix = cvec.transform(df[df.target == 0].text)
+    pos_doc_matrix = cvec.transform(df[df.target == 4].text)
+    neg_tf = np.sum(neg_doc_matrix, axis=0)
+    pos_tf = np.sum(pos_doc_matrix, axis=0)
+    neg = np.squeeze(np.asarray(neg_tf))
+    pos = np.squeeze(np.asarray(pos_tf))
+    term_freq_df = pd.DataFrame([neg, pos],
+                                columns=cvec.get_feature_names()
+                                ).transpose()
+    term_freq_df.columns = ['negative', 'positive']
+    term_freq_df['total'] = term_freq_df['negative'] + term_freq_df['positive']
+    term_freq_df.sort_values(by='total', ascending=False).iloc[:10]
+    y_pos = np.arange(50)
+    plt.figure(figsize=(12, 10))
+    plt.bar(y_pos,
+            term_freq_df.sort_values(by='negative', ascending=False)
+            ['negative'][:50],
+            align='center',
+            alpha=0.5)
+    plt.xticks(y_pos,
+               term_freq_df.sort_values(by='negative', ascending=False)
+               ['negative']
+               [:50].index,
+               rotation='vertical')
+    plt.ylabel('Frequency')
+    plt.xlabel('Top 50 negative tokens')
+    plt.title('Top 50 tokens in negative tweets')
+    plt.show()
+    y_pos = np.arange(50)
+    plt.figure(figsize=(12, 10))
+    plt.bar(y_pos,
+            term_freq_df.sort_values(by='positive', ascending=False)
+            ['positive'][:50],
+            align='center',
+            alpha=0.5)
+    plt.xticks(y_pos,
+               term_freq_df.sort_values(by='positive', ascending=False)
+               ['positive']
+               [:50].index,
+               rotation='vertical')
+    plt.ylabel('Frequency')
+    plt.xlabel('Top 50 positive tokens')
+    plt.title('Top 50 tokens in positive tweets')
+    plt.show()
+
+
+def explore_dataset():
+    cvec = CountVectorizer(preprocessor=tweet_cleaner, stop_words=gensim.parsing.preprocessing.STOPWORDS)
+    cvec.fit(df.text)
+    neg_doc_matrix = cvec.transform(df[df.target == 0].text)
+    pos_doc_matrix = cvec.transform(df[df.target == 4].text)
+    neg_tf = np.sum(neg_doc_matrix, axis=0)
+    pos_tf = np.sum(pos_doc_matrix, axis=0)
+    neg = np.squeeze(np.asarray(neg_tf))
+    pos = np.squeeze(np.asarray(pos_tf))
+    term_freq_df = pd.DataFrame([neg, pos],
+                                columns=cvec.get_feature_names()
+                                ).transpose()
+    term_freq_df.columns = ['negative', 'positive']
+    term_freq_df['total'] = term_freq_df['negative'] + term_freq_df['positive']
+    term_freq_df.sort_values(by='total', ascending=False).iloc[:10]
+    y_pos = np.arange(50)
+    plt.figure(figsize=(12, 10))
+    plt.bar(y_pos,
+            term_freq_df.sort_values(by='negative', ascending=False)
+            ['negative'][:50],
+            align='center',
+            alpha=0.5)
+    plt.xticks(y_pos,
+               term_freq_df.sort_values(by='negative', ascending=False)
+               ['negative']
+               [:50].index,
+               rotation='vertical')
+    plt.ylabel('Frequency')
+    plt.xlabel('Top 50 negative tokens')
+    plt.title('Top 50 tokens in negative tweets')
+    plt.show()
+    y_pos = np.arange(50)
+    plt.figure(figsize=(12, 10))
+    plt.bar(y_pos,
+            term_freq_df.sort_values(by='positive', ascending=False)
+            ['positive'][:50],
+            align='center',
+            alpha=0.5)
+    plt.xticks(y_pos,
+               term_freq_df.sort_values(by='positive', ascending=False)
+               ['positive']
+               [:50].index,
+               rotation='vertical')
+    plt.ylabel('Frequency')
+    plt.xlabel('Top 50 positive tokens')
+    plt.title('Top 50 tokens in positive tweets')
+    plt.show()
+
+explore_dataset()
 
 
 ## End of Question 1.
