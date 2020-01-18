@@ -1,3 +1,4 @@
+import csv
 import re
 
 import gensim
@@ -5,6 +6,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
+from keras import Input
+from keras import layers
+from keras.models import Sequential
+from keras.optimizers import RMSprop
+from keras.models import Model
+from keras_preprocessing.sequence import pad_sequences
 from nltk import WordPunctTokenizer
 from sklearn.base import TransformerMixin
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer, TfidfVectorizer
@@ -13,26 +20,29 @@ from sklearn.metrics import confusion_matrix, classification_report, accuracy_sc
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
-# from keras
-# keras.preprocessing.text.Tokenizer
+from keras.preprocessing.text import Tokenizer
+from tensorflow.python.estimator import keras
+import tensorflow_estimator
 
 
 class ExclaimTransformer(TransformerMixin):
 
     def transform(self, X, **transform_params):
-        exclaims = pd.DataFrame(X.apply(lambda x:  x.count("!")))
+        exclaims = pd.DataFrame(X.apply(lambda x: x.count("!")))
         return exclaims
 
     def fit(self, X, y=None, **fit_params):
         return self
+
 
 class TimeOfDayTransformer(TransformerMixin):
     def transform(self, X, **transform_params):
-        exclaims = pd.DataFrame(X.apply(lambda x:  float(x.split(" ")[3].split(":")[0])))
+        exclaims = pd.DataFrame(X.apply(lambda x: float(x.split(" ")[3].split(":")[0])))
         return exclaims
 
     def fit(self, X, y=None, **fit_params):
         return self
+
 
 class ColumnExtractor(TransformerMixin):
 
@@ -44,6 +54,8 @@ class ColumnExtractor(TransformerMixin):
 
     def fit(self, X, y=None):
         return self
+
+
 #
 # class TimeColumnExtractor(object):
 #
@@ -261,6 +273,7 @@ def load_dict_contractions():
 SMILEY = load_dict_smileys()
 CONTRACTIONS = load_dict_contractions()
 
+
 def tweet_cleaner(text, tags_removal=True, links_removal=True, transform_smilies=True, transform_contractions=True):
     remove_tags = r'@[A-Za-z0-9]+'
     remove_links = r'https?://[A-Za-z0-9./]+'
@@ -304,11 +317,20 @@ def tweet_cleaner(text, tags_removal=True, links_removal=True, transform_smilies
 
 colnames = ['target', 'tweet_id', 'date', 'query', 'user', 'text']
 df = pd.read_csv("training.1600000.processed.noemoticon.csv", encoding='latin-1', names=colnames, header=None, engine='python',
-                     error_bad_lines=False)
-# df_all = pd.read_csv("training.1600000.processed.noemoticon.csv", encoding='latin-1', names=colnames, header=None, engine='python',
-#                      error_bad_lines=False)
-# df = df.sample(n=1000, replace=False)
+                 error_bad_lines=False)
+
+# Uncomment to run trainings faster on a smaller dataset
+# df = df.sample(n=10000, replace=False)
 tokenizer = WordPunctTokenizer()
+
+
+def normalize_binary(x):
+    if x == 4:
+        return 1
+    return 0
+
+
+df['label'] = df.target.map(normalize_binary)
 
 # df['length'] = df['text'].str.len()
 # exclaimer = lambda x: x.count("!")
@@ -336,8 +358,6 @@ tokenizer = WordPunctTokenizer()
 #
 # # above line will be different depending on where you saved your data, and your file name
 # print(df.groupby(['target', 'time']).agg({'length': 'mean', 'exclaim':'mean', 'point':'mean', 'capital':'mean', 'capital_lower_ration':'mean', 'multiple':'mean'}))
-
-
 
 
 # cvec = CountVectorizer(preprocessor=tweet_cleaner, stop_words=gensim.parsing.preprocessing.STOPWORDS)
@@ -398,101 +418,167 @@ tokenizer = WordPunctTokenizer()
 # models\approaches, and tune parameters. One of the models should be based on ‘deep learning’
 # approach. Evaluation metrics: accuracy. Present train and test accuracy for the different models and preprocessing combinations.
 
-X_train, X_test, y_train, y_test = train_test_split(df.drop(labels="target", axis=1), df.target, test_size=0.2, random_state=0)
+# X_train, X_test, y_train, y_test = train_test_split(df.drop(labels="target", axis=1), df.target, test_size=0.2, random_state=0)
 #
-# # first = pipeline.fit(X_train,y_train)
-# # first_accuracy = pipeline.score(X=X_test, y=y_test)
 #
 pipeline = Pipeline([
-('features', FeatureUnion([
-    # ('exclaim', ExclaimTransformer()),
-    ('exclaim', Pipeline([
-        ('column_extractor', ColumnExtractor("text")),
-        ('exclaim', ExclaimTransformer()),
-    ])),
-    ('timeOfDay', Pipeline([
-        ('column_extractor', ColumnExtractor("date")),
-        ('exclaim', TimeOfDayTransformer()),
-    ])),
-    ('ngram_tf_idf', Pipeline([
-        ('column_extractor', ColumnExtractor("text")),
-        ('counts', CountVectorizer()),
-        ('tf_idf', TfidfTransformer())
-    ])),
+    ('features', FeatureUnion([
+        # ('exclaim', ExclaimTransformer()),
+        ('exclaim', Pipeline([
+            ('column_extractor', ColumnExtractor("text")),
+            ('exclaim', ExclaimTransformer()),
+        ])),
+        ('timeOfDay', Pipeline([
+            ('column_extractor', ColumnExtractor("date")),
+            ('exclaim', TimeOfDayTransformer()),
+        ])),
+        ('ngram_tf_idf', Pipeline([
+            ('column_extractor', ColumnExtractor("text")),
+            ('counts', CountVectorizer()),
+            ('tf_idf', TfidfTransformer())
+        ])),
 
-  ])),
+    ])),
 
     ('clf', LogisticRegression(n_jobs=-1)),
 ])
 
 parameters = {
     'features__ngram_tf_idf__counts__max_df': (0.5, 0.75),
-    'features__ngram_tf_idf__counts__max_features': (5000,  10000),
+    'features__ngram_tf_idf__counts__max_features': (5000, 10000),
     'features__ngram_tf_idf__counts__ngram_range': ((1, 1), (1, 2)),  # unigrams, bigrams ot trigrams
     'features__ngram_tf_idf__counts__preprocessor': (None, tweet_cleaner),
     'clf__penalty': ('l2', None),
 
 }
 
-grid_search = GridSearchCV(pipeline, parameters, n_jobs=-1, verbose=1)
+best_score = 0
+best_model = None
+is_cnn_best = False
 
-print("Performing grid search...")
-print("pipeline:", [name for name, _ in pipeline.steps])
-print("parameters:")
-print(parameters)
-# t0 = time()
-grid_search.fit(X_train, y_train)
-# print("done in %0.3fs" % (time() - t0))
-print()
 
-print("Best score: %0.3f" % grid_search.best_score_)
-print("Best parameters set:")
-best_parameters = grid_search.best_estimator_.get_params()
-for param_name in sorted(parameters.keys()):
-    print("\t%s: %r" % (param_name, best_parameters[param_name]))
-
-logistic_regression_model = grid_search.best_estimator_
+# grid_search = GridSearchCV(pipeline, parameters, n_jobs=-1, verbose=1)
+#
+# print("Performing grid search...")
+# print("pipeline:", [name for name, _ in pipeline.steps])
+# print("parameters:")
+# print(parameters)
+# # t0 = time()
+# grid_search.fit(X_train, y_train)
+# # print("done in %0.3fs" % (time() - t0))
+# print()
+#
+# print("Best score: %0.3f" % grid_search.best_score_)
+# print("Best parameters set:")
+# best_parameters = grid_search.best_estimator_.get_params()
+# for param_name in sorted(parameters.keys()):
+#     print("\t%s: %r" % (param_name, best_parameters[param_name]))
+#
+# best_model = grid_search.best_estimator_
+# best_score = grid_search.best_score_
 
 ### Done with non-neural network model.
 
-# cut off reviews after 500 words
-max_len = 500
-# train on 10000 samples
-training_samples = 10000
- # validate on 10000 samples
-validation_samples = 10000
-# consider only the top 10000 words
-max_words = 10000
+def plot_history(history):
+    acc = history.history['acc']
+    val_acc = history.history['val_acc']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    x = range(1, len(acc) + 1)
 
-# import tokenizer with the consideration for only the top 500 words
-tokenizer = Tokenizer(num_words=max_words)
-# fit the tokenizer on the texts
-tokenizer.fit_on_texts(df.text)
-# convert the texts to sequences
-sequences = tokenizer.texts_to_sequences(df.text)
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    plt.plot(x, acc, 'b', label='Training acc')
+    plt.plot(x, val_acc, 'r', label='Validation acc')
+    plt.title('Training and validation accuracy')
+    plt.legend()
+    plt.subplot(1, 2, 2)
+    plt.plot(x, loss, 'b', label='Training loss')
+    plt.plot(x, val_loss, 'r', label='Validation loss')
+    plt.title('Training and validation loss')
+    plt.legend()
 
-word_index = tokenizer.word_index
-print('Found %s unique tokens. ' % len(word_index))
+# Preprocess tweets
+df['clean_text'] = df.text.map(tweet_cleaner)
 
- # pad the sequence to the required length to ensure uniformity
-data = pad_sequences(sequences, maxlen=max_len)
-print('Data Shape: {}'.format(data.shape))
+# Split dataset
+sentences_train, sentences_test, y_train, y_test = train_test_split(
+    df.clean_text.values, df.label.values, test_size=0.25, random_state=1000)
 
-labels = np.asarray(labels)
-print("Shape of data tensor: ", data.shape)
-print("Shape of label tensor: ", labels.shape)
+# Fit tokenizer
+model_tokenizer = Tokenizer(num_words=5000)
+model_tokenizer.fit_on_texts(sentences_train)
 
-# split the data into training and validation set but before that shuffle it first
-indices = np.arange(data.shape[0])
-np.random.shuffle(indices)
-data = data[indices]
-labels = labels[indices]
+# Convert text to sequence
+X_train = model_tokenizer.texts_to_sequences(sentences_train)
+X_test = model_tokenizer.texts_to_sequences(sentences_test)
 
-x_train = data[:training_samples]
-y_train = labels[:training_samples]
-x_val = data[training_samples:training_samples + validation_samples]
-y_val = labels[training_samples:training_samples + validation_samples]
+vocab_size = len(model_tokenizer.word_index) + 1
 
-# test_data
-x_test = data[training_samples+validation_samples:]
-y_test = labels[training_samples+validation_samples:]
+maxlen = 200
+
+# Make all tweets max size of 200 tokens. Pad shorter ones with zeros.
+X_train = pad_sequences(X_train, padding='post', maxlen=maxlen)
+X_test = pad_sequences(X_test, padding='post', maxlen=maxlen)
+
+embedding_dim = 100
+
+text_input_layer = layers.Input(shape=(maxlen,))
+embedding_layer = layers.Embedding(vocab_size, 50)(text_input_layer)
+text_layer = layers.Conv1D(256, 3, activation='relu')(embedding_layer)
+text_layer = layers.MaxPooling1D(3)(text_layer)
+text_layer = layers.Conv1D(256, 3, activation='relu')(text_layer)
+text_layer = layers.MaxPooling1D(3)(text_layer)
+text_layer = layers.Conv1D(256, 3, activation='relu')(text_layer)
+text_layer = layers.MaxPooling1D(3)(text_layer)
+text_layer = layers.GlobalMaxPooling1D()(text_layer)
+text_layer = layers.Dense(256, activation='relu')(text_layer)
+output_layer = layers.Dense(1, activation='sigmoid')(text_layer)
+model = Model(text_input_layer, output_layer)
+
+model.summary()
+
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+history = model.fit(X_train, y_train,
+                    epochs=3,
+                    verbose=True,
+                    validation_data=(X_test, y_test),
+                    batch_size=512)
+loss, accuracy = model.evaluate(X_train, y_train, verbose=True)
+print("Training Accuracy: {:.4f}".format(accuracy))
+loss, accuracy = model.evaluate(X_test, y_test, verbose=True)
+print("Testing Accuracy:  {:.4f}".format(accuracy))
+plot_history(history)
+
+if accuracy > best_score:
+    best_score = accuracy
+    best_model = model
+    is_cnn_best = True
+
+
+def predict_on_new_tweets(model, is_cnn_best):
+    colnames = ['tweet_id', 'date', 'query', 'user', 'text']
+    df = pd.read_csv("Test.csv", encoding='latin-1', names=colnames, header=None, engine='python',
+                     error_bad_lines=False)
+
+    if is_cnn_best:
+        X = df.text.map(tweet_cleaner).values
+        X = model_tokenizer.texts_to_sequences(X)
+        X = pad_sequences(X, padding='post', maxlen=maxlen)
+    else:
+        X = df.text
+
+    test_pred = model.predict(X)
+    i = 0
+    finalans = ["ID,Sentiment"]
+    for val in test_pred:
+        finalans.append(str(i) + "," + str(int(round(val[0]))))
+        i += 1
+    print(finalans)
+
+    with open("out1.csv", "w") as f:
+        wr = csv.writer(f, delimiter="\n")
+        wr.writerow(finalans)
